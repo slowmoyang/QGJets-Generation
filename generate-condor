@@ -1,0 +1,85 @@
+#!/bin/sh
+MCGEN=$1
+FINAL=$2
+OUT_DIR=$3
+DELPHES_CARD=$4
+ADDITIONAL_CARDS=$5
+
+PARENT_DIR=$(dirname ${OUT_DIR})
+NAME=$(basename ${OUT_DIR})
+
+if [ ! -d ${PARENT_DIR} ]; then
+    mkdir -v ${PARENT_DIR}
+fi
+
+
+export MYMG5=${MCGEN}/MG5_aMC_v2_6_3_2
+export PATH=${MYMG5}/bin:${PATH}
+export MYHEPTOOLS=${MYMG5}/HEPTools
+
+export MYPYTHIA8=${MYHEPTOOLS}/pythia8/
+export PYTHIA8DATA=${MYPYTHIA8}/share/Pythia8/xmldoc
+
+export MYDELPHES=${MCGEN}/Delphes-3.4.1
+export PATH=:${MYDELPHES}:${PATH}
+export LD_LIBRARY_PATH=:${MYDELPHES}:${LD_LIBRARY_PATH}
+
+export MYLHAPDF6=${MCGEN}/LHAPDF-6.2.1
+export PATH=${MYLHAPDF6}/bin:${PATH}
+export LD_LIBRARY_PATH=${MYLHAPDF6}/lib:${LD_LIBRARY_PATH}
+
+
+if [ "$FINAL" == "qq" ]; then
+    PROCESS="p p > q q"
+elif [ "$FINAL" == "gg" ]; then
+    PROCESS="p p > g g"
+elif [ "$FINAL" == "qg" -o "$FINAL" == "gq"  ]; then
+    PROCESS="p p > q g"
+elif [ "${FINAL}" == "jj" ]; then
+    PROCESS="p p > j j"
+elif [ "$FINAL" == "zq" ]; then
+    PROCESS="p p > z q"
+elif [ "$FINAL" == "zg" ]; then
+    PROCESS="p p > z g"
+elif [ "$FINAL" == "zj" ]; then
+    PROCESS="p p > z j"
+else
+    echo "Expected one of ['qq', 'qg', 'gg', 'jj', 'zq', 'zg', 'zj'], got '${FINAL}'"
+    echo "Please choose one of the following: qq, gg qg gq zq zg"
+    exit 1
+fi
+
+echo "FINAL: ${FINAL}"
+echo "PROCESS: ${PROCESS}"
+echo "PARENT_DIR: ${PARENT_DIR}"
+echo "NAME: ${NAME}"
+echo "DELPHES_CARD: ${DELPHES_CARD}"
+echo "ADDITIONAL_CARDS: ${ADDITIONAL_CARDS}"
+echo $(ls -l)
+
+if [ ! -f ${DELPHES_CARD} ]; then
+    echo "NOT FOUND: ${DELPHES_CARD}"
+    exit 1
+fi
+
+if [ ! -f ${ADDITIONAL_CARDS} ]; then
+    echo "NOT FOUND: ${ADDITIONAL_CARDS}"
+    exit 1
+fi
+
+CMD="define q=u d s u~ d~ s~
+generate ${PROCESS}
+output ${NAME}
+launch
+shower=PYTHIA8
+detector=DELPHES
+done
+${DELPHES_CARD}
+${ADDITIONAL_CARDS}
+"
+
+# Execute 
+echo "$CMD" | exec ${MYMG5}/bin/mg5_aMC
+# mv -v ${NAME} /home/scratch/slowmoyang/QGJets/0-Generated
+rm -v ${NAME}/Events/run_01/tag_1_pythia8_events.hepmc.gz
+mv -v ${NAME} ${PARENT_DIR}
