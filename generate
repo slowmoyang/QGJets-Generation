@@ -1,0 +1,99 @@
+#!/bin/sh
+MCGEN=$1
+NAME=$2
+DESTINATION=$3
+FINAL=$4
+DELPHES_CARD=$5
+ADDITIONAL_CARDS=$6
+
+
+# NOTE Setup
+ 
+if [ _$CMS_PATH == _ ]; then
+  export CMS_PATH={2}  
+fi
+source $CMS_PATH/cmsset_default.sh
+echo "CMS_PATH: ${CMS_PATH}"
+
+
+cd ${MCGEN}
+eval `scram runtime -sh`
+echo ${CMSSW_VERSION}
+echo ${SCRAM_ARCH}
+cd -
+
+python --version
+
+# Libraries
+export MYLIBS=${MCGEN}/libs
+
+export MYMG5=${MYLIBS}/MG5_aMC_v2_6_3_2/
+export PATH=${MYMG5}/bin:${PATH}
+
+export MYHEPTOOLS=${MYMG5}/HEPTools
+
+export MYPYTHIA8=${MYHEPTOOLS}/pythia8
+export PYTHIA8DATA=${MYPYTHIA8}/share/Pythia8/xmldoc
+
+export MYLHAPDF6=${MYLIBS}/lhapdf-6.2.1
+export PATH=${MYLHAPDF6}/bin:${PATH}
+export LD_LIBRARY_PATH=${MYLHAPDF6}/bin:${LD_LIBRARY_PATH}
+
+export MYFASTJET=${MYLIBS}/fastjet-3.3.2
+export PATH=${MYFASTJET}/bin:${PATH}
+export LD_LIBRARY_PATH=${MYFASTJET}/lib:${LD_LIBRARY_PATH}
+
+export MYDELPHES=${MYLIBS}/Delphes-3.4.1
+export PATH=${MYDELPHES}:${PATH}
+export LD_LIBRARY_PATH=${MYDELPHES}:${LD_LIBRARY_PATH}
+
+
+if [ "$FINAL" == "qq" ]; then
+    PROCESS="p p > q q"
+elif [ "$FINAL" == "gg" ]; then
+    PROCESS="p p > g g"
+elif [ "$FINAL" == "qg" ]; then
+    PROCESS="p p > q g"
+elif [ "${FINAL}" == "jj" ]; then
+    PROCESS="p p > j j"
+elif [ "$FINAL" == "zq" ]; then
+    PROCESS="p p > z q"
+elif [ "$FINAL" == "zg" ]; then
+    PROCESS="p p > z g"
+elif [ "$FINAL" == "zj" ]; then
+    PROCESS="p p > z j"
+else
+    echo "Expected one of ['qq', 'qg', 'gg', 'jj', 'zq', 'zg', 'zj'], got '${FINAL}'"
+    echo "Please choose one of the following: qq, gg qg zq zg"
+    exit 1
+fi
+
+if [ ! -f ${DELPHES_CARD} ]; then
+    echo "NOT FOUND: ${DELPHES_CARD}"
+    exit 1
+fi
+
+if [ ! -f ${ADDITIONAL_CARDS} ]; then
+    echo "NOT FOUND: ${ADDITIONAL_CARDS}"
+    exit 1
+fi
+
+# cd ${PARENT_DIR}
+
+CMD="load options ${MYMG5}/input/mg5_configuration.txt
+define j=g u d s u~ d~ s~
+define q=u d s u~ d~ s~
+generate ${PROCESS}
+output ${NAME}
+launch
+shower=PYTHIA8
+detector=DELPHES
+done
+${DELPHES_CARD}
+${ADDITIONAL_CARDS}
+/cms/ldap_home/slowmoyang/Projects/MG5-CMSSW_10_3_1/src/qgjets-nocr-generaation/pythia8_card_nocr.dat
+"
+
+# Execute 
+echo "$CMD" | exec ${MYMG5}/bin/mg5_aMC
+xrdcp ${NAME}/Events/run_01/tag_1_delphes_events.root ${DESTINATION}/${NAME}.root

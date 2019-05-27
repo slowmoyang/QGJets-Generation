@@ -5,6 +5,11 @@ else
     exit
 fi
 
+XRD_BASE="root://cms-xrdr.private.lo:2094//xrd/store/user/seyang/"
+MYXRD=/xrootd/store/user/seyang//
+MYQGGEN="/cms/ldap_home/slowmoyang/Projects/MG5-CMSSW_10_3_1/src/qgjets-nocr-generaation"
+
+
 function submit-qgjet() {
     FINAL=${1}
     MIN_PT=${2}
@@ -16,15 +21,17 @@ function submit-qgjet() {
     echo "MIN_PT: ${MIN_PT}"
     echo "MAX_PT: ${MAX_PT}"
 
-    if [ ["$FINAL" == "qq" -o "$FINAL" == "gg"] -o "$FINAL" == 'jj' ]; then
+    if [ "$FINAL" == "qq" -o "$FINAL" == "gg" -o "$FINAL" == 'jj' -o "${FINAL}" == "qg" ]; then
         CARD_SUFFIX="jj_${MIN_PT}_${MAX_PT}"
-    elif [ ["$FINAL" == "zq" -o "${FINAL}" == "zg"] -o "$FINAL" == 'zj' ]; then
+    elif [ "$FINAL" == "zq" -o "${FINAL}" == "zg" -o "$FINAL" == 'zj' ]; then
         CARD_SUFFIX="zj_${MIN_PT}_${MAX_PT}"
     else
         echo "Expected one of ['qq', 'qg', 'gg', 'jj', 'zq', 'zg', 'zj'], got '${FINAL}'"
         echo "Please choose one of the following: qq, gg qg gq zq zg"
         exit 1
     fi
+
+    echo $CARD_SUFFIX
 
     echo "Running pp->${FINAL}"
 
@@ -37,29 +44,26 @@ function submit-qgjet() {
 
     for RUN_SUFFIX in $(seq ${START} ${END}); do
         RUN="pt_${MIN_PT}_${MAX_PT}_${RUN_SUFFIX}"
-        NAME="mg5_pp_${FINAL}_default_${RUN}"
+        NAME="mg5_pp_${FINAL}_${RUN}"
+        DESTINATION=${XRD_BASE}/qgjets-nocr/
 
-        OUT_DIR=${MYSTORE}/QGJets/0-Generated/${NAME}
+        DEST=$(sed 's@'"${XRD_BASE}"'@'"${MYXRD}"'@' <<< "${DESTINATION}")
 
-        if [ -d ${OUT_DIR} ]; then
-            echo "${OUT_DIR} already exists!!!"
+        if [ ! -d ${DEST} ]; then
+            echo  "${DEST} not found!!!"
+            exit 1
+        fi
+
+        OUTPUT_FILE=${DEST}/${NAME}.root
+        if [ -f ${OUTPUT_FILE} ]; then
+            echo "${OUTPUT_FILE} already exists!!!"
             continue
         fi
 
-        submit-job -e=generate-condor \
-                   -a ${MCGEN} ${FINAL} ${OUT_DIR} ${DELPHES_CARD} ${ADDITIONAL_CARDS} \
+        submit-job -e=generate \
+                   -a ${MCGEN} ${NAME} ${DESTINATION} ${FINAL} ${DELPHES_CARD} ${ADDITIONAL_CARDS} \
                    -b "${FINAL}_${MIN_PT}_${MAX_PT}" \
                    -j "job_${FINAL}_${MIN_PT}_${MAX_PT}" \
                    -s "RUN-${RUN_SUFFIX}" 
     done
 }
-
-# submit-qgjet 'jj' 100 110 2 10
-# submit-qgjet 'jj' 200 220 1 10
-# submit-qgjet 'jj' 500 550 1 10
-# submit-qgjet 'jj' 1000 1100 1 10
-
-# submit-qgjet 'zj' 100 110 2 450
-submit-qgjet 'zj' 200 220 1
-# submit-qgjet 'zj' 500 550 1
-# submit-qgjet 'zj' 1000 1100 1
